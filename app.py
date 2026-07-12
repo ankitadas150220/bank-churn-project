@@ -143,3 +143,9 @@ st.markdown(f"### Current Risk Score: {score}")
 if score <= 30:
     st.success(f"✅ Risk Score: {score} — LOW RISK")
 elif score <= 60:
+    st.warning(f"⚠️ Risk Score: {score} — MEDIUM RISK")
+else:
+    st.error(f"🔴 Risk Score: {score} — HIGH RISK")
+
+st.markdown("---")
+st.markdown("*Dashboard built by Ankita Das | Unified Mentor Internship | Bank Customer Churn Analysis Project*")
