@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 
 # Page Configuration
 st.set_page_config(
@@ -39,11 +38,8 @@ st.header("🌍 Churn by Country")
 geo = df.groupby("Geography")["Exited"].agg(["sum", "count"]).reset_index()
 geo.columns = ["Country", "Churned", "Total"]
 geo["Churn Rate %"] = round(geo["Churned"] * 100 / geo["Total"], 2)
-fig1 = px.bar(geo, x="Country", y="Churn Rate %",
-              color="Country", text="Churn Rate %",
-              title="Churn Rate by Country",
-              color_discrete_sequence=["#FF6B6B", "#4ECDC4", "#45B7D1"])
-st.plotly_chart(fig1, use_container_width=True)
+st.bar_chart(geo.set_index("Country")["Churn Rate %"])
+st.dataframe(geo)
 
 st.markdown("---")
 
@@ -52,11 +48,8 @@ st.header("👫 Churn by Gender")
 gen = df.groupby("Gender")["Exited"].agg(["sum", "count"]).reset_index()
 gen.columns = ["Gender", "Churned", "Total"]
 gen["Churn Rate %"] = round(gen["Churned"] * 100 / gen["Total"], 2)
-fig2 = px.bar(gen, x="Gender", y="Churn Rate %",
-              color="Gender", text="Churn Rate %",
-              title="Churn Rate by Gender",
-              color_discrete_sequence=["#FF6B6B", "#4ECDC4"])
-st.plotly_chart(fig2, use_container_width=True)
+st.bar_chart(gen.set_index("Gender")["Churn Rate %"])
+st.dataframe(gen)
 
 st.markdown("---")
 
@@ -65,14 +58,11 @@ st.header("👴 Churn by Age Group")
 df["Age_Group"] = pd.cut(df["Age"],
                           bins=[0, 30, 45, 100],
                           labels=["Young", "Middle", "Senior"])
-age = df.groupby("Age_Group")["Exited"].agg(["sum", "count"]).reset_index()
+age = df.groupby("Age_Group", observed=True)["Exited"].agg(["sum", "count"]).reset_index()
 age.columns = ["Age Group", "Churned", "Total"]
 age["Churn Rate %"] = round(age["Churned"] * 100 / age["Total"], 2)
-fig3 = px.bar(age, x="Age Group", y="Churn Rate %",
-              color="Age Group", text="Churn Rate %",
-              title="Churn Rate by Age Group",
-              color_discrete_sequence=["#4ECDC4", "#45B7D1", "#FF6B6B"])
-st.plotly_chart(fig3, use_container_width=True)
+st.bar_chart(age.set_index("Age Group")["Churn Rate %"])
+st.dataframe(age)
 
 st.markdown("---")
 
@@ -81,15 +71,23 @@ st.header("📦 Churn by Number of Products")
 prod = df.groupby("NumOfProducts")["Exited"].agg(["sum", "count"]).reset_index()
 prod.columns = ["Products", "Churned", "Total"]
 prod["Churn Rate %"] = round(prod["Churned"] * 100 / prod["Total"], 2)
-fig4 = px.bar(prod, x="Products", y="Churn Rate %",
-              color="Products", text="Churn Rate %",
-              title="Churn Rate by Number of Products",
-              color_discrete_sequence=["#4ECDC4", "#45B7D1", "#FF6B6B", "#FF4500"])
-st.plotly_chart(fig4, use_container_width=True)
+st.bar_chart(prod.set_index("Products")["Churn Rate %"])
+st.dataframe(prod)
 
 st.markdown("---")
 
-# SECTION 6 - Risk Score Distribution
+# SECTION 6 - Active vs Inactive
+st.header("😴 Active vs Inactive Members")
+active = df.groupby("IsActiveMember")["Exited"].agg(["sum", "count"]).reset_index()
+active["Status"] = active["IsActiveMember"].map({1: "Active", 0: "Inactive"})
+active.columns = ["IsActiveMember", "Churned", "Total", "Status"]
+active["Churn Rate %"] = round(active["Churned"] * 100 / active["Total"], 2)
+st.bar_chart(active.set_index("Status")["Churn Rate %"])
+st.dataframe(active[["Status", "Churned", "Total", "Churn Rate %"]])
+
+st.markdown("---")
+
+# SECTION 7 - Risk Score Distribution
 st.header("🎯 Churn Risk Score Distribution")
 
 def calculate_risk(row):
@@ -104,22 +102,20 @@ def calculate_risk(row):
     return score
 
 df["Risk_Score"] = df.apply(calculate_risk, axis=1)
-df["Risk_Category"] = pd.cut(df["Risk_Score"],
-                              bins=[-1, 30, 60, 120],
-                              labels=["Low Risk", "Medium Risk", "High Risk"])
+df["Risk_Category"] = df["Risk_Score"].apply(
+    lambda x: "High Risk" if x > 60 else ("Medium Risk" if x > 30 else "Low Risk")
+)
 
 risk = df["Risk_Category"].value_counts().reset_index()
 risk.columns = ["Risk Category", "Count"]
-fig5 = px.pie(risk, names="Risk Category", values="Count",
-              title="Customer Distribution by Risk Category",
-              color_discrete_sequence=["#4ECDC4", "#FFD700", "#FF6B6B"])
-st.plotly_chart(fig5, use_container_width=True)
+st.bar_chart(risk.set_index("Risk Category")["Count"])
+st.dataframe(risk)
 
 st.markdown("---")
 
-# SECTION 7 - Risk Calculator
+# SECTION 8 - Risk Calculator
 st.header("🧮 Customer Churn Risk Calculator")
-st.markdown("Enter customer details below to calculate their churn risk score:")
+st.markdown("Enter customer details to calculate churn risk:")
 
 col1, col2 = st.columns(2)
 with col1:
@@ -133,7 +129,6 @@ with col2:
     num_products = st.slider("Number of Products", 1, 4, 1)
     balance = st.number_input("Account Balance", 0, 300000, 50000)
 
-# Calculate Score
 score = 0
 if age > 45: score += 30
 if is_active == "No": score += 25
@@ -143,14 +138,8 @@ if balance == 0: score += 10
 if gender == "Female": score += 10
 if credit_score < 500: score += 10
 
-if st.button("Calculate Risk Score"):
-    st.markdown("### Result:")
-    if score <= 30:
-        st.success(f"✅ Risk Score: {score} — LOW RISK")
-    elif score <= 60:
-        st.warning(f"⚠️ Risk Score: {score} — MEDIUM RISK")
-    else:
-        st.error(f"🔴 Risk Score: {score} — HIGH RISK")
+st.markdown(f"### Current Risk Score: {score}")
 
-st.markdown("---")
-st.markdown("*Dashboard built by Ankita Das | Unified Mentor Internship | Bank Customer Churn Analysis Project*")
+if score <= 30:
+    st.success(f"✅ Risk Score: {score} — LOW RISK")
+elif score <= 60:
